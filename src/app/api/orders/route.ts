@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { orderItems, orders, productImages, products } from "@/db/schema";
 import { generateOrderNumber, PAYMENT_METHODS, SHIPPING_METHODS, shippingCostFor } from "@/lib/utils";
 import { notifyOrderCreated } from "@/lib/notify";
+import { clientAddress, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +17,21 @@ type Payload = {
   items?: unknown;
 };
 
+class StockUnavailableError extends Error {
+  constructor(public readonly productName: string, public readonly available: number) {
+    super("Stock insuffisant");
+  }
+}
+
 function str(value: unknown, max = 200) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
 export async function POST(request: Request) {
+  const limit = rateLimit(`orders:${clientAddress(request)}`, 10, 15 * 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Trop de tentatives. Réessayez plus tard." }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
+  }
   let payload: Payload;
   try {
     payload = (await request.json()) as Payload;
@@ -60,6 +71,9 @@ export async function POST(request: Request) {
   const method = PAYMENT_METHODS.find((m) => m.id === paymentMethod);
   if (!method) {
     return NextResponse.json({ error: "Mode de paiement invalide." }, { status: 400 });
+  }
+  if (method.kind === "card") {
+    return NextResponse.json({ error: "Le paiement par carte sera bientôt disponible. Choisissez un autre mode de paiement." }, { status: 400 });
   }
   if (method.kind === "mobile" && paymentPhone.replace(/\D/g, "").length !== 10) {
     return NextResponse.json({ error: "Le numéro Mobile Money doit comporter 10 chiffres." }, { status: 400 });
@@ -108,8 +122,7 @@ export async function POST(request: Request) {
   const shippingCents = shippingCostFor(shippingMethod, subtotalCents);
   const totalCents = subtotalCents + shippingCents;
 
-  const status =
-    method.kind === "transfer" ? "pending_payment" : method.kind === "cod" ? "pay_on_delivery" : "confirmed";
+  const status = method.kind === "cod" ? "pay_on_delivery" : "pending_payment";
 
   let orderNumber = generateOrderNumber();
   let orderId = 0;
@@ -121,6 +134,18 @@ export async function POST(request: Request) {
         const existing = await tx.select({ id: orders.id }).from(orders).where(eq(orders.orderNumber, orderNumber)).limit(1);
         if (existing.length === 0) break;
         orderNumber = generateOrderNumber();
+      }
+
+      // Réserver le stock avec une condition atomique : le contrôle effectué
+      // avant la transaction ne suffit pas en cas de commandes concurrentes.
+      for (const p of catalogue) {
+        const quantity = wanted.get(p.id) ?? 0;
+        const reserved = await tx
+          .update(products)
+          .set({ stock: sql`${products.stock} - ${quantity}` })
+          .where(sql`${products.id} = ${p.id} AND ${products.stock} >= ${quantity}`)
+          .returning({ id: products.id, stock: products.stock });
+        if (reserved.length === 0) throw new StockUnavailableError(p.name, p.stock);
       }
 
       const [order] = await tx
@@ -161,14 +186,14 @@ export async function POST(request: Request) {
         })),
       );
 
-      for (const p of catalogue) {
-        await tx
-          .update(products)
-          .set({ stock: sql`${products.stock} - ${wanted.get(p.id) ?? 0}` })
-          .where(eq(products.id, p.id));
-      }
     });
   } catch (error) {
+    if (error instanceof StockUnavailableError) {
+      return NextResponse.json(
+        { error: `Stock insuffisant pour « ${error.productName} » (${error.available} disponible${error.available > 1 ? "s" : ""}).` },
+        { status: 409 },
+      );
+    }
     console.error("Order creation failed", error);
     return NextResponse.json({ error: "Impossible d'enregistrer la commande. Merci de réessayer." }, { status: 500 });
   }

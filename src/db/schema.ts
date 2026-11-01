@@ -104,13 +104,13 @@ export const orders = pgTable(
     city: text("city").notNull().default("Abidjan"),
     country: text("country").notNull().default("Côte d'Ivoire"),
     shippingMethod: text("shipping_method").notNull(),
-    paymentMethod: text("payment_method").notNull().default("card"),
+    paymentMethod: text("payment_method").notNull().default("orange_money"),
     paymentPhone: text("payment_phone").notNull().default(""),
     subtotalCents: integer("subtotal_cents").notNull(),
     shippingCents: integer("shipping_cents").notNull(),
     totalCents: integer("total_cents").notNull(),
-    /** confirmed → validated → shipped → delivered | cancelled. pending_payment / pay_on_delivery for offline methods. */
-    status: text("status").notNull().default("confirmed"),
+    /** pending_payment/confirmed/pay_on_delivery → validated → shipped → delivered | cancelled. */
+    status: text("status").notNull().default("pending_payment"),
     validatedAt: timestamp("validated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

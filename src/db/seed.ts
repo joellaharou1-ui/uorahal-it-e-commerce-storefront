@@ -111,6 +111,7 @@ type SeedGlobal = typeof globalThis & { __uorahalSeedPromise?: Promise<unknown> 
  * cheap "select ... limit 1" when the catalogue is already populated.
  */
 export function ensureSeeded(): Promise<unknown> {
+  if (process.env.ALLOW_AUTO_SEED !== "true") return Promise.resolve();
   const g = globalThis as SeedGlobal;
   if (!g.__uorahalSeedPromise) {
     g.__uorahalSeedPromise = seedDatabase().catch((error) => {

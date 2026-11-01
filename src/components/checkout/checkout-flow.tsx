@@ -92,7 +92,6 @@ const shippingIcons: Record<ShippingMethodId, typeof Truck> = {
 
 const paymentKinds: { id: PaymentKind; label: string; sub: string; icon: typeof Truck }[] = [
   { id: "mobile", label: "Mobile Money", sub: "Orange, MTN, Wave, Moov", icon: Smartphone },
-  { id: "card", label: "Carte bancaire", sub: "Visa, Mastercard", icon: CreditCard },
   { id: "cod", label: "À la livraison", sub: "Espèces ou Mobile Money", icon: Banknote },
   { id: "transfer", label: "Virement", sub: "Entreprises & administrations", icon: Landmark },
 ];
@@ -379,7 +378,7 @@ export function CheckoutFlow() {
             <section className="animate-fade-up space-y-6">
               <div>
                 <h2 className="display text-3xl">Paiement</h2>
-                <p className="mt-1.5 text-sm text-ink-500">Transaction chiffrée. Aucune donnée bancaire n&apos;est conservée.</p>
+                <p className="mt-1.5 text-sm text-ink-500">Choisissez votre mode de règlement. Aucun numéro de carte n&apos;est demandé ni conservé.</p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

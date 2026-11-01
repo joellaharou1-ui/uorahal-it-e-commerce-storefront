@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orderItems, orders, products } from "@/db/schema";
 import {
@@ -73,8 +73,21 @@ export async function setOrderStatusAction(formData: FormData) {
 
   const firstValidation = to === "validated" && !current.validatedAt;
 
+  let transitionApplied = false;
   await db.transaction(async (tx) => {
-    // Annulation : remettre les articles en stock, une seule fois.
+    const updated = await tx
+      .update(orders)
+      .set({
+        status: to,
+        ...(firstValidation ? { validatedAt: new Date() } : {}),
+      })
+      .where(and(eq(orders.id, current.id), eq(orders.status, from)))
+      .returning({ id: orders.id });
+    if (updated.length === 0) return;
+    transitionApplied = true;
+
+    // Annulation : remettre les articles en stock une seule fois, après une
+    // transition conditionnelle réussie.
     if (to === "cancelled") {
       const lines = await tx
         .select({ productId: orderItems.productId, quantity: orderItems.quantity })
@@ -88,15 +101,9 @@ export async function setOrderStatusAction(formData: FormData) {
           .where(eq(products.id, line.productId));
       }
     }
-
-    await tx
-      .update(orders)
-      .set({
-        status: to,
-        ...(firstValidation ? { validatedAt: new Date() } : {}),
-      })
-      .where(eq(orders.id, current.id));
   });
+
+  if (!transitionApplied) redirect("/admin?error=invalid-transition");
 
   // Première validation : prévenir le client (e-mail et WhatsApp). Ne bloque jamais la mise à jour.
   if (firstValidation) await notifyOrderValidated(current.id);

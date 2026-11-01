@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { products, reviews } from "@/db/schema";
+import { clientAddress, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,10 @@ function clean(value: unknown, max: number) {
 }
 
 export async function POST(request: Request) {
+  const limit = rateLimit(`reviews:${clientAddress(request)}`, 5, 60 * 60_000);
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Trop d’avis envoyés. Réessayez plus tard." }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
+  }
   let payload: Payload;
   try {
     payload = (await request.json()) as Payload;

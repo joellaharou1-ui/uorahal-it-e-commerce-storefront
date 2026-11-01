@@ -1,7 +1,7 @@
 /** Cycle de vie des commandes. Client-safe : aucune dépendance serveur. */
 export const ORDER_STATUSES = {
   confirmed: { label: "Reçue", tone: "amber" },
-  pending_payment: { label: "Virement en attente", tone: "amber" },
+  pending_payment: { label: "Paiement en attente", tone: "amber" },
   pay_on_delivery: { label: "Paiement à la livraison", tone: "violet" },
   validated: { label: "Validée", tone: "blue" },
   shipped: { label: "Expédiée", tone: "violet" },
