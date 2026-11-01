@@ -30,6 +30,9 @@ export function Header({ categories }: { categories: NavCategory[] }) {
   }, []);
 
   useEffect(() => {
+    // Fermer les panneaux locaux après une navigation côté client.
+    // Cette synchronisation est intentionnelle : l’état doit suivre l’URL.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileOpen(false);
     setSearchOpen(false);
   }, [pathname]);

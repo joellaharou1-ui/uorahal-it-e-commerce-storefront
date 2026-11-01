@@ -47,6 +47,8 @@ export function ShopFilters({
   const [minInput, setMinInput] = useState(minPrice);
   const [maxInput, setMaxInput] = useState(maxPrice);
   useEffect(() => {
+    // Les champs éditables doivent refléter les paramètres de l’URL après une navigation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMinInput(minPrice);
     setMaxInput(maxPrice);
   }, [minPrice, maxPrice]);
